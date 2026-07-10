@@ -210,18 +210,15 @@ publishing {
 
     repositories {
         maven {
-            val snapshotUrl = getEnvVar("MAVEN_SNAPSHOT_URL") ?: return@maven
-            val releaseUrl = getEnvVar("MAVEN_RELEASE_URL") ?: return@maven
+            name = "ModlNexus"
+            url = uri("https://nexus.modl.gg/repository/maven-releases/")
 
-            // Check which URL should be used
-            url = uri(if ((version as String).endsWith("SNAPSHOT")) snapshotUrl else releaseUrl)
-
-            val mavenUsername = getEnvVar("MAVEN_USERNAME") ?: return@maven
-            val mavenPassword = getEnvVar("MAVEN_PASSWORD") ?: return@maven
+            val nexusUser = getEnvVar("NEXUS_USER") ?: return@maven
+            val nexusPass = getEnvVar("NEXUS_PASS") ?: return@maven
 
             credentials {
-                username = mavenUsername
-                password = mavenPassword
+                username = nexusUser
+                password = nexusPass
             }
         }
     }

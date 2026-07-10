@@ -21,58 +21,12 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
           cache: 'gradle'
-          server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
-          settings-path: ${{ github.workspace }} # location for the settings.xml file
 
       - name: Build with Gradle
         run: chmod +x gradlew && ./gradlew build
 
-      - name: Upload build artifacts api
-        uses: actions/upload-artifact@v7
-        with:
-          name: api-build
-          path: build/libs/packetevents-api-*.jar
-
-      - name: Upload build artifacts spigot
-        uses: actions/upload-artifact@v7
-        with:
-          name: spigot-build
-          path: build/libs/packetevents-spigot-*.jar
-
-      - name: Upload build artifacts netty-common
-        uses: actions/upload-artifact@v7
-        with:
-          name: netty-common-build
-          path: build/libs/packetevents-netty-common-*.jar
-
-      - name: Upload build artifacts bungeecord
-        uses: actions/upload-artifact@v7
-        with:
-          name: bungeecord-build
-          path: build/libs/packetevents-bungeecord-*.jar
-
-      - name: Upload build artifacts velocity
-        uses: actions/upload-artifact@v7
-        with:
-          name: velocity-build
-          path: build/libs/packetevents-velocity-*.jar
-
-      - name: Upload build artifacts fabric
-        uses: actions/upload-artifact@v7
-        with:
-          name: fabric-build
-          path: build/libs/packetevents-fabric-*.jar
-
-      - name: Upload build artifacts sponge
-        uses: actions/upload-artifact@v7
-        with:
-          name: sponge-build
-          path: build/libs/packetevents-sponge-*.jar
-
-      - name: Publish with Gradle
+      - name: Publish to Nexus
         run: ./gradlew publish
         env:
-          MAVEN_SNAPSHOT_URL: ${{ secrets.MAVEN_SNAPSHOT_URL }}
-          MAVEN_RELEASE_URL:  ${{ secrets.MAVEN_RELEASE_URL }}
-          MAVEN_USERNAME:     ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD:     ${{ secrets.MAVEN_PASSWORD }}
+          NEXUS_USER: ${{ secrets.NEXUS_USER }}
+          NEXUS_PASS: ${{ secrets.NEXUS_PASS }}

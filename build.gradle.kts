@@ -32,7 +32,7 @@ ext["artifactVersion"] = buildString {
 }
 
 
-group = "com.github.retrooper"
+group = "gg.modl.minecraft.packetevents"
 description = rootProject.name
 version = buildString {
     append(ext["fullVersion"])

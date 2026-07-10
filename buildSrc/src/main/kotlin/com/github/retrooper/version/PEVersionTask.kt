@@ -65,7 +65,7 @@ abstract class PEVersionTask : DefaultTask() {
         val snapshotCommit: String?
     ) {
         companion object {
-            private val REGEX = Regex("""(\d+)\.(\d+)\.(\d+)(?:\+([0-9a-f]+)-SNAPSHOT)?""")
+            private val REGEX = Regex("""(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+([0-9a-f]+)-SNAPSHOT)?""")
 
             fun fromString(version: String): Version {
                 val match = REGEX.matchEntire(version) ?: throw IllegalArgumentException("Invalid version: $version")
