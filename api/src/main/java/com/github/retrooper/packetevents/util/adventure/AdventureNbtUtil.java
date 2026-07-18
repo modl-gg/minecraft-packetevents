@@ -68,9 +68,17 @@ public final class AdventureNbtUtil {
     private AdventureNbtUtil() {
     }
 
+    private static void forceBinaryTagTypesInitialization() {
+        try {
+            BinaryTagTypes.class.getField("BYTE").get(null);
+        } catch (ReflectiveOperationException exception) {
+            throw new RuntimeException("Failed to initialize adventure binary tag types", exception);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static BinaryTagType<?>[] buildNbtTagTypes() {
-        BinaryTagTypes.BYTE.id(); // initialize types
+        forceBinaryTagTypesInitialization();
 
         // v4 keeps TYPES on BinaryTagType; v5 moves it to a subclass reachable via BYTE.
         List<BinaryTagType<? extends BinaryTag>> types = null;
