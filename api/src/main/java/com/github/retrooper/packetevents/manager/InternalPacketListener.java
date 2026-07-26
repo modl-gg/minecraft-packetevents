@@ -62,6 +62,41 @@ public class InternalPacketListener extends PacketListenerAbstract {
         return preVia;
     }
 
+    /**
+     * Whether the pre-Via and post-Via connection states are genuinely separate streams.
+     * <p>
+     * They only are when {@code preViaInjection} puts a second codec, and a matching {@code preVia}
+     * listener, into the pipeline — something only the Spigot, Sponge and Fabric platforms ever do.
+     * On the proxies the split is inert but not harmless: their codecs build events from the
+     * <i>pre</i>-Via state (they pass {@code autoProtocolTranslation = false} to EventCreationUtil)
+     * while EventManager only dispatches to the <i>post</i>-Via listener. Updating just the post-Via
+     * state there strands the state the codec actually reads on LOGIN for the whole connection, so
+     * every packet after login success is decoded against the wrong protocol state.
+     */
+    private static boolean hasSeparateViaState() {
+        return PacketEvents.getAPI().getSettings().isPreViaInjection();
+    }
+
+    private void updateEncoderState(User user, ConnectionState state) {
+        if (preVia) {
+            user.setPreViaEncoderState(state);
+        } else if (hasSeparateViaState()) {
+            user.setPostViaEncoderState(state);
+        } else {
+            user.setEncoderState(state); // updates the pre- and post-Via state together
+        }
+    }
+
+    private void updateDecoderState(User user, ConnectionState state) {
+        if (preVia) {
+            user.setPreViaDecoderState(state);
+        } else if (hasSeparateViaState()) {
+            user.setPostViaDecoderState(state);
+        } else {
+            user.setDecoderState(state); // updates the pre- and post-Via state together
+        }
+    }
+
     @Override
     public void onPacketSend(PacketSendEvent event) {
         User user = event.getUser();
@@ -94,21 +129,20 @@ public class InternalPacketListener extends PacketListenerAbstract {
             // Switch the user's connection state immediately so subsequent packets encode in the right
             // protocol state. Pre-Via and post-Via may transition into different states when ViaVersion
             // bridges a client whose protocol doesn't have the configuration phase to a server whose
-            // protocol does (or vice-versa), so handle the four cases independently.
-            if (event.getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_20_2)) {
-                if (preVia) {
-                    user.setPreViaEncoderState(ConnectionState.CONFIGURATION);
-                } else {
-                    user.setPostViaEncoderState(ConnectionState.CONFIGURATION);
-                }
+            // protocol does (or vice-versa), so route the write through the helpers above.
+            //
+            // On a proxy the "server version" is only the newest protocol the proxy speaks, never the
+            // protocol this player negotiated, so the configuration phase has to be decided from the
+            // client version instead.
+            ClientVersion clientVersion = user.getClientVersion();
+            boolean configurationPhase = PacketEvents.getAPI().getInjector().isProxy() && clientVersion != null
+                    ? clientVersion.isNewerThanOrEquals(ClientVersion.V_1_20_2)
+                    : event.getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_20_2);
+            if (configurationPhase) {
+                updateEncoderState(user, ConnectionState.CONFIGURATION);
             } else {
-                if (preVia) {
-                    user.setPreViaEncoderState(ConnectionState.PLAY);
-                    user.setPreViaDecoderState(ConnectionState.PLAY);
-                } else {
-                    user.setPostViaEncoderState(ConnectionState.PLAY);
-                    user.setPostViaDecoderState(ConnectionState.PLAY);
-                }
+                updateEncoderState(user, ConnectionState.PLAY);
+                updateDecoderState(user, ConnectionState.PLAY);
             }
         }
 
@@ -117,9 +151,9 @@ public class InternalPacketListener extends PacketListenerAbstract {
         // configuration transitions below.
         if (preVia) {
             if (event.getPacketType() == PacketType.Play.Server.CONFIGURATION_START) {
-                user.setPreViaEncoderState(ConnectionState.CONFIGURATION);
+                updateEncoderState(user, ConnectionState.CONFIGURATION);
             } else if (event.getPacketType() == PacketType.Configuration.Server.CONFIGURATION_END) {
-                user.setPreViaEncoderState(ConnectionState.PLAY);
+                updateEncoderState(user, ConnectionState.PLAY);
             }
             return;
         }
@@ -156,9 +190,9 @@ public class InternalPacketListener extends PacketListenerAbstract {
             WrapperPlayServerRespawn packet = new WrapperPlayServerRespawn(event);
             user.setDimensionType(packet.getDimensionType());
         } else if (event.getPacketType() == PacketType.Play.Server.CONFIGURATION_START) {
-            user.setPostViaEncoderState(ConnectionState.CONFIGURATION);
+            updateEncoderState(user, ConnectionState.CONFIGURATION);
         } else if (event.getPacketType() == PacketType.Configuration.Server.CONFIGURATION_END) {
-            user.setPostViaEncoderState(ConnectionState.PLAY);
+            updateEncoderState(user, ConnectionState.PLAY);
             user.finalizeRegistries(new WrapperConfigServerConfigurationEnd(event));
         }
     }
@@ -183,23 +217,11 @@ public class InternalPacketListener extends PacketListenerAbstract {
             user.setClientVersion(clientVersion);
             user.setConnectionState(state);
         } else if (event.getPacketType() == PacketType.Login.Client.LOGIN_SUCCESS_ACK) {
-            if (preVia) {
-                user.setPreViaDecoderState(ConnectionState.CONFIGURATION);
-            } else {
-                user.setPostViaDecoderState(ConnectionState.CONFIGURATION);
-            }
+            updateDecoderState(user, ConnectionState.CONFIGURATION);
         } else if (event.getPacketType() == PacketType.Play.Client.CONFIGURATION_ACK) {
-            if (preVia) {
-                user.setPreViaDecoderState(ConnectionState.CONFIGURATION);
-            } else {
-                user.setPostViaDecoderState(ConnectionState.CONFIGURATION);
-            }
+            updateDecoderState(user, ConnectionState.CONFIGURATION);
         } else if (event.getPacketType() == PacketType.Configuration.Client.CONFIGURATION_END_ACK) {
-            if (preVia) {
-                user.setPreViaDecoderState(ConnectionState.PLAY);
-            } else {
-                user.setPostViaDecoderState(ConnectionState.PLAY);
-            }
+            updateDecoderState(user, ConnectionState.PLAY);
         }
     }
 }
